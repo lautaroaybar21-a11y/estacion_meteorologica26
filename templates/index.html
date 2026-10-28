@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6f2">
+  <title>Estación meteorológica | Monitor</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</head>
+<body>
+  <main class="container">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow"><span class="eyebrow-mark"></span>MONITOREO AMBIENTAL</p>
+        <h1>Estación meteorológica</h1>
+        <p class="subtitle">Lecturas de sensores y condiciones del entorno</p>
+      </div>
+      <div class="header-meta">
+        <span id="database-status" class="live-pill">
+          <span class="status-dot"></span>
+          <span class="status-label">Verificando MySQL</span>
+        </span>
+        <span id="last-updated" class="last-updated">Esperando mediciones</span>
+      </div>
+    </header>
+
+    <section class="readings-section" aria-labelledby="readings-heading">
+      <div class="section-heading readings-heading">
+        <div>
+          <p class="eyebrow">ESTADO ACTUAL</p>
+          <h2 id="readings-heading">Última lectura</h2>
+        </div>
+        <button id="refresh-button" class="button button-refresh" type="button">
+          <span aria-hidden="true">↻</span> Actualizar
+        </button>
+      </div>
+      <div class="reading-grid">
+        <article class="reading-card reading-temperature">
+          <span class="reading-icon" aria-hidden="true">°</span>
+          <p>Temperatura BMP</p>
+          <strong id="current-temperature-bmp">--</strong>
+          <span class="reading-unit">grados Celsius</span>
+        </article>
+        <article class="reading-card reading-temperature">
+          <span class="reading-icon" aria-hidden="true">°</span>
+          <p>Temperatura DHT</p>
+          <strong id="current-temperature-dht">--</strong>
+          <span class="reading-unit">grados Celsius</span>
+        </article>
+        <article class="reading-card reading-air">
+          <span class="reading-icon" aria-hidden="true">%</span>
+          <p>Humedad del aire</p>
+          <strong id="current-air-humidity">--</strong>
+          <span class="reading-unit">humedad relativa</span>
+        </article>
+        <article class="reading-card reading-pressure">
+          <span class="reading-icon" aria-hidden="true">↗</span>
+          <p>Presión atmosférica</p>
+          <strong id="current-pressure">--</strong>
+          <span class="reading-unit">hectopascales</span>
+        </article>
+        <article class="reading-card reading-soil">
+          <span class="reading-icon" aria-hidden="true">%</span>
+          <p>Humedad del suelo</p>
+          <strong id="current-soil-humidity">--</strong>
+          <span id="current-soil-raw" class="reading-unit">RAW: --</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel chart-panel" aria-labelledby="chart-heading">
+      <div class="chart-header">
+        <div>
+          <p class="eyebrow">ANÁLISIS HISTÓRICO</p>
+          <h2 id="chart-heading">Evolución en el tiempo</h2>
+          <p class="section-description">Explorá cómo cambió cada variable medida.</p>
+        </div>
+        <label class="period-control" for="periodo">
+          Período
+          <select id="periodo">
+            <option value="24h">Últimas 24 horas</option>
+            <option value="7d">Últimos 7 días</option>
+            <option value="30d">Últimos 30 días</option>
+            <option value="todo">Todo el historial</option>
+          </select>
+        </label>
+      </div>
+      <div id="metric-selector" class="metric-selector" role="group" aria-label="Variable del gráfico">
+        <button class="metric-button is-active" type="button" data-metric="temperatura_bmp" aria-pressed="true">Temp. BMP</button>
+        <button class="metric-button" type="button" data-metric="temperatura_dht" aria-pressed="false">Temp. DHT</button>
+        <button class="metric-button" type="button" data-metric="humedad_aire" aria-pressed="false">Humedad aire</button>
+        <button class="metric-button" type="button" data-metric="humedad_suelo_pct" aria-pressed="false">Humedad suelo</button>
+        <button class="metric-button" type="button" data-metric="presion_hpa" aria-pressed="false">Presión</button>
+      </div>
+      <p id="chart-message" class="empty-state" role="status" hidden></p>
+      <div id="chart-container" class="chart-container" hidden>
+        <canvas id="measurements-chart" aria-label="Evolución de la variable elegida"></canvas>
+      </div>
+      <div id="chart-footer" class="chart-footer" hidden>
+        <span id="chart-series-label"></span>
+        <span id="chart-points"></span>
+      </div>
+    </section>
+
+    <section class="panel history-panel" aria-labelledby="history-heading">
+      <div class="history-header">
+        <div>
+          <p class="eyebrow">REGISTRO</p>
+          <h2 id="history-heading">Historial de mediciones</h2>
+          <p id="history-count" class="section-description">Cargando historial…</p>
+        </div>
+      </div>
+      <p id="history-message" class="empty-state" role="status" hidden></p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Fecha y hora</th>
+              <th scope="col">Temp. BMP</th>
+              <th scope="col">Temp. DHT</th>
+              <th scope="col">Humedad aire</th>
+              <th scope="col">Presión</th>
+              <th scope="col">RAW suelo</th>
+              <th scope="col">Humedad suelo</th>
+            </tr>
+          </thead>
+          <tbody id="measurements-body"></tbody>
+        </table>
+      </div>
+      <nav class="pagination" aria-label="Paginación del historial">
+        <button id="previous-page" class="button button-secondary" type="button">Anterior</button>
+        <span id="page-label">Página 1 de 1</span>
+        <button id="next-page" class="button button-secondary" type="button">Siguiente</button>
+      </nav>
+    </section>
+    <footer>
+      <span>Estación meteorológica · Datos guardados localmente en MySQL</span>
+      <span>Suelo: RAW 1023 = 0% · RAW 300 = 100%</span>
+    </footer>
+  </main>
+</body>
+</html>
